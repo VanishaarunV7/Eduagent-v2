@@ -10,7 +10,8 @@ const Student = require('../models/Student');
  */
 exports.handleChat = async (req, res) => {
   try {
-    const { student_id, course_id, message, session_id } = req.body;
+    const student_id = req.user.role === 'student' ? req.user.student_id : req.body.student_id;
+    const { course_id, message, session_id } = req.body;
 
     // Request validation
     if (!student_id || typeof student_id !== 'string' || !student_id.trim()) {
@@ -51,7 +52,7 @@ exports.handleChat = async (req, res) => {
  */
 exports.getHistory = async (req, res) => {
   try {
-    const { studentId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
 
     if (!studentId || typeof studentId !== 'string' || !studentId.trim()) {
       return res.status(400).json({ message: 'Missing or invalid required parameter: studentId' });

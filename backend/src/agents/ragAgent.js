@@ -27,14 +27,20 @@ class RAGAgent {
       }
 
       // 2. Retrieve matching chunks from vector store (fetching up to 8 chunks to cover longer tasks)
-      const chunks = await retriever.retrieveContext(message, studentId, courseId, 8);
+      let chunks = [];
+      try {
+        chunks = await retriever.retrieveContext(message, studentId, courseId, 8);
+      } catch (err) {
+        console.warn('[RAGAgent] Vector store retrieval failed, continuing with empty context chunks:', err.message);
+        chunks = [];
+      }
 
       // 3. Delegate to Intent Router
       return await intentRouter.route(studentId, courseId, message, chunks, historyMessages);
 
     } catch (error) {
       console.error('[RAGAgent Error]:', error);
-      throw error;
+      return "The requested information is not available in your uploaded study material.";
     }
   }
 }

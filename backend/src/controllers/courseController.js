@@ -6,7 +6,7 @@ const Course = require('../models/Course');
 // @access  Public
 exports.getCoursesByStudentId = async (req, res) => {
   try {
-    const { studentId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
 
     // 1. Find student by student_id
     const student = await Student.findOne({ student_id: studentId });

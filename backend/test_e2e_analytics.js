@@ -2,9 +2,19 @@ const PORT = process.env.PORT || 5000;
 const baseUrl = `http://localhost:${PORT}`;
 
 async function run() {
-  console.log(`[Analytics Agent E2E Test] Sending query to ${baseUrl}/api/chat...`);
-
   try {
+    console.log("[Test] Logging in to get JWT token...");
+    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'student@eduagent.com', password: 'Student@123' })
+    });
+    const loginData = await loginRes.json();
+    const token = loginData.token;
+    console.log("[Test] Token acquired successfully.");
+
+    console.log(`[Analytics Agent E2E Test] Sending query to ${baseUrl}/api/chat...`);
+
     const payload = {
       student_id: 'stu001',
       course_id: 'cs_dbms',
@@ -13,17 +23,19 @@ async function run() {
 
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(payload)
     });
 
     console.log('HTTP Status:', res.status);
+    const data = await res.json();
     if (res.status !== 200) {
+      console.log('Response Payload on Failure:', JSON.stringify(data, null, 2));
       throw new Error(`Unexpected status code: ${res.status}`);
     }
-
-    const data = await res.json();
-    console.log('Response Payload:', JSON.stringify(data, null, 2));
 
     // Validations
     console.log('\n--- Validating Response Structure ---');

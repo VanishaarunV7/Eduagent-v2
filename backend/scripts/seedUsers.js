@@ -69,7 +69,40 @@ const DEFAULT_USERS = [
     teacher_id: null,
     admin_id:   'adm001',
     program_id: null
-  }
+  },
+  {
+    userId:     'usr_student_001_alt',
+    name:       'Student One',
+    email:      'stu001@eduagent.com',
+    password:   'Student@123',
+    role:       'student',
+    student_id: 'stu001',
+    teacher_id: null,
+    admin_id:   null,
+    program_id: 'btech_cs'
+  },
+  {
+    userId:     'usr_student_002_alt',
+    name:       'Student Two',
+    email:      'stu002@eduagent.com',
+    password:   'Student@123',
+    role:       'student',
+    student_id: 'stu002',
+    teacher_id: null,
+    admin_id:   null,
+    program_id: 'btech_cs'
+  },
+  {
+    userId:     'usr_student_010_alt',
+    name:       'Student Ten',
+    email:      'stu010@eduagent.com',
+    password:   'Student@123',
+    role:       'student',
+    student_id: 'stu010',
+    teacher_id: null,
+    admin_id:   null,
+    program_id: 'btech_cs'
+  },
 ];
 
 async function seedUsers() {

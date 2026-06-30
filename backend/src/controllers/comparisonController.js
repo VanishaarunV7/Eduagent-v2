@@ -5,7 +5,8 @@ const Result = require('../models/Result');
 // @access  Public
 exports.getComparisonData = async (req, res) => {
   try {
-    const { studentId, courseId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
+    const { courseId } = req.params;
 
     // Find all results matching the student and course
     const results = await Result.find({ student_id: studentId, course_id: courseId });

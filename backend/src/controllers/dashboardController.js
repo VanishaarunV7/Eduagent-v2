@@ -4,14 +4,23 @@ const Result = require('../models/Result');
 const Topic = require('../models/Topic');
 const Outcome = require('../models/Outcome');
 const ExamSchedule = require('../models/ExamSchedule');
+const Course = require('../models/Course');
+const Attendance = require('../models/Attendance');
+const Assignment = require('../models/Assignment');
+const AssignmentSubmission = require('../models/AssignmentSubmission');
+const Announcement = require('../models/Announcement');
+const StudyMaterial = require('../models/StudyMaterial');
 
 // @desc    Get dashboard data for a student in a course
 // @route   GET /api/dashboard/:studentId/:courseId
 // @access  Public
 exports.getDashboardData = async (req, res) => {
   try {
-    const studentId = req.user.student_id;
-    const courseId = req.query.courseId;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
+    const courseId = req.params.courseId;
+
+    console.log(studentId);
+    console.log(courseId);
 
     // Verify MongoDB Connection state to prevent buffering timeouts
     if (mongoose.connection.readyState !== 1) {
@@ -20,24 +29,46 @@ exports.getDashboardData = async (req, res) => {
       });
     }
 
-    console.log("Student ID:", studentId);
-    console.log("Course ID:", courseId);
+    // Role-based security check for student
+    if (req.user && req.user.role === 'student' && req.user.student_id !== studentId) {
+      return res.status(403).json({ message: "Access denied. You can only view your own dashboard." });
+    }
 
     // 1. Fetch student to check if they exist
     const student = await Student.findOne({ student_id: studentId }, { _id: 0, __v: 0 });
-    console.log("Student Found:", student);
+    console.log(student);
 
     if (!student) {
-      return res.status(404).json({ message: `Student with ID '${studentId}' not found` });
+      return res.status(404).json({ message: "Resource not found" });
     }
 
-    // 2. Fetch all other details in parallel
-    const [results, topics, outcomes, examSchedule] = await Promise.all([
+    // 2. Fetch course to check if it exists
+    const course = await Course.findOne({ course_id: courseId });
+    console.log(course);
+
+    if (!course) {
+      return res.status(404).json({ message: "Resource not found" });
+    }
+
+    // 3. Fetch all other details in parallel
+    const [results, topics, outcomes, examSchedule, attendanceLogs, assignments, submissions, announcements, studyMaterials] = await Promise.all([
       Result.find({ student_id: studentId, course_id: courseId }),
       Topic.find({ course_id: courseId }),
       Outcome.find({ course_id: courseId }),
-      ExamSchedule.findOne({ course_id: courseId }, { _id: 0, __v: 0 })
+      ExamSchedule.findOne({ course_id: courseId }, { _id: 0, __v: 0 }),
+      Attendance.find({ student_id: studentId, course_id: courseId }),
+      Assignment.find({ course_id: courseId }),
+      AssignmentSubmission.find({ student_id: studentId }),
+      Announcement.find({
+        $or: [
+          { target_type: 'all' },
+          { target_type: 'program', target_id: student.program_id },
+          { target_type: 'course', target_id: courseId }
+        ]
+      }).sort({ createdAt: -1 }),
+      StudyMaterial.find({ courseId: courseId })
     ]);
+    console.log(results);
 
     // 3. Compute Analytics
     let analytics = {};
@@ -124,13 +155,87 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
+    // Compute Attendance statistics from database
+    const totalCount = attendanceLogs.length;
+    const presentCount = attendanceLogs.filter(a => a.status === 'Present').length;
+    // Calculate cumulative attendance. Default to 85% if no records yet to keep initial display healthy.
+    const attendance = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 85;
+
+    const todayStart = new Date();
+    todayStart.setUTCHours(0,0,0,0);
+    const todayRecord = attendanceLogs.find(a => new Date(a.date).getTime() >= todayStart.getTime());
+    const presentToday = todayRecord ? todayRecord.status : 'Not Marked';
+    
+    // Sort and limit attendance logs for UI history
+    const attendanceHistory = attendanceLogs
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10)
+      .map(a => ({
+        date: a.date.toISOString().split('T')[0],
+        status: a.status,
+        lecture_number: a.lecture_number || 1
+      }));
+
+    // Process assignments status
+    const enrichedAssignments = assignments.map(a => {
+      const sub = submissions.find(s => s.assignment_id.toString() === a._id.toString());
+      let status = 'Not Started';
+      let marks_obtained = null;
+      let feedback = '';
+
+      if (sub) {
+        marks_obtained = sub.marks_obtained;
+        feedback = sub.feedback;
+        status = sub.marks_obtained !== null ? 'Reviewed' : 'Submitted';
+      } else if (new Date(a.due_date).getTime() < Date.now()) {
+        status = 'Overdue';
+      }
+
+      const daysLeft = Math.ceil((new Date(a.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+      return {
+        _id: a._id,
+        title: a.title,
+        description: a.description,
+        due_date: a.due_date,
+        max_marks: a.max_marks,
+        status,
+        marks_obtained,
+        feedback,
+        daysLeft: daysLeft > 0 ? daysLeft : 0
+      };
+    });
+
+    const gpa = Math.min(4.0, Math.max(1.0, parseFloat((averageMarks / 25).toFixed(2))));
+    let academicStatus = "Good Standing";
+    if (gpa >= 3.5 && attendance >= 85) {
+      academicStatus = "Honor Roll";
+    } else if (gpa < 2.2 || attendance < 75) {
+      academicStatus = "Academic Probation";
+    }
+
     // 6. Return Structured Dashboard Data
     res.status(200).json({
       student,
       analytics,
       topics: topicPerformanceList,
       outcomes: outcomeList,
-      upcoming_exam: examSchedule || {}
+      upcoming_exam: examSchedule || {},
+      attendance,
+      present_today: presentToday,
+      attendance_history: attendanceHistory,
+      assignments: enrichedAssignments,
+      announcements,
+      study_materials: studyMaterials.map(m => ({
+        _id: m._id,
+        filename: m.filename,
+        fileType: m.fileType,
+        subject: m.subject,
+        uploadDate: m.uploadDate,
+        filePath: m.filePath
+      })),
+      gpa,
+      academic_status: academicStatus
     });
 
   } catch (error) {

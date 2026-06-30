@@ -19,6 +19,10 @@ const Result = require('../models/Result');
 const Topic = require('../models/Topic');
 const Outcome = require('../models/Outcome');
 const ExamSchedule = require('../models/ExamSchedule');
+const Attendance = require('../models/Attendance');
+const Assignment = require('../models/Assignment');
+const AssignmentSubmission = require('../models/AssignmentSubmission');
+const Announcement = require('../models/Announcement');
 const groqService = require('../services/groqService');
 const ragService = require('../services/ragService');
 const retriever = require('../rag/retriever');
@@ -45,6 +49,16 @@ class AnalyticsAgent {
    */
   classifyIntent(message) {
     const msg = message.toLowerCase().trim();
+
+    if (/(attendance|present|absent|attendance status|percentage of attendance)/i.test(msg)) {
+      return 'attendance';
+    }
+    if (/(assignment|homework|pending project|task|tasks|evaluat)/i.test(msg)) {
+      return 'assignments';
+    }
+    if (/(notice|announcement|alert|placement|cancel|workshop|holiday|notifications)/i.test(msg)) {
+      return 'notifications';
+    }
 
     // Cross-course intents (no courseId needed)
     if (/(strongest course|best course|which course.*strong|which.*course.*best|my best subject)/i.test(msg)) {
@@ -379,6 +393,23 @@ class AnalyticsAgent {
     const name = studentName;
 
     switch (intent) {
+      case 'attendance':
+        return `${name} is asking about their ATTENDANCE logs. Focus your response on:
+- Giving their overall attendance percentage from the context
+- Highlighting whether it is below the 75% required university threshold
+- Reminding them of how many classes they were present/absent for
+- Giving brief learning-focused suggestions if attendance is critically low`;
+
+      case 'assignments':
+        return `${name} is asking about their homework ASSIGNMENTS. Focus your response on:
+- Listing pending assignments with their respective due dates
+- Highlighting if any pending assignments are overdue
+- Acknowledging completed assignments and evaluation marks or feedback`;
+
+      case 'notifications':
+        return `${name} is asking about university alerts or ANNOUNCEMENTS. Focus your response on:
+- Summarizing recent placement updates, workshop details, holiday notifications, or cancellation alerts listed in the context`;
+
       case 'weak_topics':
         return `${name} is asking about their WEAK topics. Focus your response on:
 - Listing all weak topics (score < ${WEAK_THRESHOLD}%) with their exact scores
@@ -523,7 +554,7 @@ class AnalyticsAgent {
           agent: this.agentName,
           intent: 'error',
           analysis: {},
-          reply: 'No student record found. Please ensure your student profile is set up correctly.'
+          reply: 'No student performance data is available.'
         };
       }
 
@@ -545,34 +576,73 @@ class AnalyticsAgent {
       const courseName = course ? course.course_name : (courseId || 'the course');
 
       // ── 4. Fetch & Compute Results ────────────────────────────────────────
-      const results = await Result.find({ student_id: studentId, course_id: courseId });
+      const [results, topics, outcomes, examSchedule, attendanceLogs, assignments, submissions, announcements] = await Promise.all([
+        Result.find({ student_id: studentId, course_id: courseId }),
+        Topic.find({ course_id: courseId }),
+        Outcome.find({ course_id: courseId }),
+        ExamSchedule.findOne({ course_id: courseId }, { _id: 0, __v: 0 }),
+        Attendance.find({ student_id: studentId, course_id: courseId }),
+        Assignment.find({ course_id: courseId }),
+        AssignmentSubmission.find({ student_id: studentId }),
+        Announcement.find({
+          $or: [
+            { target_type: 'all' },
+            { target_type: 'program', target_id: student.program_id },
+            { target_type: 'course', target_id: courseId }
+          ]
+        }).sort({ createdAt: -1 })
+      ]);
+
       if (!results || results.length === 0) {
         return {
           agent: this.agentName,
-          intent,
+          intent: intent || 'performance',
           analysis: {},
-          reply: `No academic results found for ${student.name} in ${courseName}. Please ensure your results have been recorded.`
+          reply: 'No student performance data is available.'
         };
       }
 
-      const { internal1, internal2, internal3, average, highest, lowest, trend, improvementPct } =
-        this.computeResultsSummary(results);
+      const resultsSummary = this.computeResultsSummary(results);
+      const { internal1, internal2, internal3, average, highest, lowest, trend, improvementPct } = resultsSummary;
+
+      // Calculate Attendance stats from DB
+      const totalAtt = attendanceLogs.length;
+      const presentAtt = attendanceLogs.filter(a => a.status === 'Present').length;
+      const attendancePercentage = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 85;
+
+      // Group assignments
+      const pendingAssignments = [];
+      const completedAssignments = [];
+      assignments.forEach(a => {
+        const sub = submissions.find(s => s.assignment_id.toString() === a._id.toString());
+        if (sub) {
+          completedAssignments.push({
+            title: a.title,
+            due_date: a.due_date,
+            marks_obtained: sub.marks_obtained,
+            feedback: sub.feedback
+          });
+        } else {
+          pendingAssignments.push({
+            title: a.title,
+            due_date: a.due_date,
+            overdue: new Date(a.due_date).getTime() < Date.now()
+          });
+        }
+      });
 
       // ── 5. Compute Topic Performance ──────────────────────────────────────
-      const topics = await Topic.find({ course_id: courseId });
       const { topicsWithScores, strongTopics, averageTopics, weakTopics } =
         this.computeTopicPerformance(topics, average);
 
       // ── 6. Compute Course Outcomes ────────────────────────────────────────
-      const outcomes = await Outcome.find({ course_id: courseId });
       const { outcomeList, highestCO, lowestCO, averageCO } =
         this.computeCourseOutcomes(outcomes, average);
 
       // ── 7. Exam Readiness & Schedule ─────────────────────────────────────
       const examReadiness = this.computeExamReadiness(average, weakTopics.length);
-      const upcomingExam = await ExamSchedule.findOne({ course_id: courseId }, { _id: 0, __v: 0 });
-      const examStr = upcomingExam && upcomingExam.exam_name
-        ? `${upcomingExam.exam_name} on ${upcomingExam.exam_date} (${upcomingExam.start_time}–${upcomingExam.end_time}) in ${upcomingExam.room}`
+      const examStr = examSchedule && examSchedule.exam_name
+        ? `${examSchedule.exam_name} on ${examSchedule.exam_date} (${examSchedule.start_time}–${examSchedule.end_time}) in ${examSchedule.room}`
         : 'No upcoming exam scheduled.';
 
       // ── 8. Targeted RAG Context ───────────────────────────────────────────
@@ -594,15 +664,21 @@ class AnalyticsAgent {
         lowestCO,
         averageCO,
         examReadiness,
-        upcomingExam: upcomingExam
+        upcomingExam: examSchedule
           ? {
-              exam_name: upcomingExam.exam_name,
-              exam_date: upcomingExam.exam_date,
-              start_time: upcomingExam.start_time,
-              end_time: upcomingExam.end_time,
-              room: upcomingExam.room
+              exam_name: examSchedule.exam_name,
+              exam_date: examSchedule.exam_date,
+              start_time: examSchedule.start_time,
+              end_time: examSchedule.end_time,
+              room: examSchedule.room
             }
-          : null
+          : null,
+        attendance: attendancePercentage,
+        attendanceLogsCount: totalAtt,
+        presentLogsCount: presentAtt,
+        pendingAssignments,
+        completedAssignments,
+        announcements
       };
 
       // ── 10. Build Structured Context for Groq ────────────────────────────
@@ -658,6 +734,17 @@ ${outcomesStr}
   • Highest CO: ${highestCO}
   • Lowest CO:  ${lowestCO}
   • Average CO Attainment: ${averageCO}%
+
+ATTENDANCE STATUS:
+  • Overall Attendance: ${attendancePercentage}% (${presentAtt}/${totalAtt} sessions present)
+  • Status: ${attendancePercentage < 75 ? 'Low Attendance Alert (Required: 75%)' : 'Good Attendance'}
+
+ASSIGNMENTS STATUS:
+  • Pending Assignments: ${pendingAssignments.length > 0 ? pendingAssignments.map(a => `"${a.title}" (Due: ${a.due_date.toISOString().split('T')[0]}${a.overdue ? ' - OVERDUE' : ''})`).join(', ') : 'None'}
+  • Completed/Graded Assignments: ${completedAssignments.length > 0 ? completedAssignments.map(a => `"${a.title}" (Marks: ${a.marks_obtained ?? 'Not Graded'})`).join(', ') : 'None'}
+
+ANNOUNCEMENTS & NOTIFICATIONS:
+  • Active Alerts: ${announcements.length > 0 ? announcements.slice(0,5).map(a => `[${a.category}] ${a.title} - ${a.content}`).join(' | ') : 'No notices posted.'}
 
 EXAM READINESS:
   • Status:        ${examReadiness}

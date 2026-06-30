@@ -7,7 +7,7 @@ const ExamSchedule = require('../models/ExamSchedule');
 // @access  Public
 exports.getExamsByStudentId = async (req, res) => {
   try {
-    const { studentId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
 
     // Check if student exists
     const student = await Student.findOne({ student_id: studentId });

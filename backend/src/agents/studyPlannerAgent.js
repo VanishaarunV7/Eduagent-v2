@@ -18,6 +18,9 @@ const Result = require('../models/Result');
 const Topic = require('../models/Topic');
 const Outcome = require('../models/Outcome');
 const ExamSchedule = require('../models/ExamSchedule');
+const Attendance = require('../models/Attendance');
+const Assignment = require('../models/Assignment');
+const AssignmentSubmission = require('../models/AssignmentSubmission');
 const groqService = require('../services/groqService');
 const ragService = require('../services/ragService');
 const retriever = require('../rag/retriever');
@@ -125,17 +128,20 @@ class StudyPlannerAgent {
    * Returns a parsed object with dailyTimetable, weeklyPlan, resources,
    * revisionStrategy, aiTips, checklist.
    */
-  async generatePlanSections(studentName, courseName, average, trend, weakTopics, strongTopics, examReadiness, upcomingExam, ragContext, historyMessages) {
+  async generatePlanSections(studentName, courseName, average, trend, weakTopics, strongTopics, examReadiness, upcomingExam, ragContext, historyMessages, attendancePercentage, pendingAssignments) {
     const weakStr   = weakTopics.length > 0 ? weakTopics.map(t => `${t.name} (${t.score}%)`).join(', ') : 'None';
     const strongStr = strongTopics.length > 0 ? strongTopics.map(t => `${t.name} (${t.score}%)`).join(', ') : 'None';
     const examStr   = upcomingExam ? `${upcomingExam.exam_name} on ${upcomingExam.exam_date} (${upcomingExam.start_time}–${upcomingExam.end_time}) in ${upcomingExam.room}` : 'No upcoming exam';
     const ragStr    = ragContext ? `\nSTUDY MATERIAL EXCERPTS (from uploaded PDF):\n${ragContext}\n` : '';
+    const pendingStr = pendingAssignments.length > 0 ? pendingAssignments.map(a => `"${a.title}" (Due: ${a.due_date.toISOString().split('T')[0]})`).join(', ') : 'None';
 
     const systemPrompt = `You are the Study Planner Agent for EduAgent. Generate a personalized study plan for ${studentName} studying ${courseName}.
 
 STUDENT DATA:
 - Average: ${average}%
 - Trend: ${trend}
+- Attendance: ${attendancePercentage}%
+- Pending Assignments to prioritize: ${pendingStr}
 - Weak Topics (< 60%): ${weakStr}
 - Strong Topics (≥ 80%): ${strongStr}
 - Exam Readiness: ${examReadiness}
@@ -144,10 +150,11 @@ ${ragStr}
 
 RULES:
 1. Focus revision heavily on weak topics. Allocate more days/sessions to them.
-2. Reference uploaded study material naturally when relevant.
-3. Be specific, practical, and encouraging.
-4. For the daily timetable, cover 7 days (Mon–Sun).
-5. For the weekly plan, cover 2 weeks with 7 tasks each.
+2. Schedule specific times/days to complete pending assignments.
+3. Reference uploaded study material naturally when relevant.
+4. Be specific, practical, and encouraging.
+5. For the daily timetable, cover 7 days (Mon–Sun).
+6. For the weekly plan, cover 2 weeks with 7 tasks each.
 
 Respond ONLY with a valid JSON object in this exact structure (no markdown, no explanation outside JSON):
 {
@@ -273,21 +280,46 @@ Respond ONLY with a valid JSON object in this exact structure (no markdown, no e
       const course    = courseId ? await Course.findOne({ course_id: courseId }) : null;
       const courseName = course ? course.course_name : (courseId || 'Your Course');
 
-      // ── 3. Compute results analytics ──────────────────────────────────────
-      const results = await Result.find({ student_id: studentId, course_id: courseId });
-      const { internal1, internal2, internal3, average, highest, lowest, trend, improvementPct } =
-        this.computeResultsSummary(results);
+      // ── 3. Fetch academic data & ERP logs in Parallel ─────────────────────
+      const [results, topicDocs, outcomeDocs, upcomingExam, attendanceLogs, assignments, submissions] = await Promise.all([
+        Result.find({ student_id: studentId, course_id: courseId }),
+        Topic.find({ course_id: courseId }),
+        Outcome.find({ course_id: courseId }),
+        ExamSchedule.findOne({ course_id: courseId }, { _id: 0, __v: 0 }),
+        Attendance.find({ student_id: studentId, course_id: courseId }),
+        Assignment.find({ course_id: courseId }),
+        AssignmentSubmission.find({ student_id: studentId })
+      ]);
+
+      const resultsSummary = results && results.length > 0
+        ? this.computeResultsSummary(results)
+        : { internal1: null, internal2: null, internal3: null, average: 75, highest: 75, lowest: 75, trend: 'Stable', improvementPct: 0 };
+      const { internal1, internal2, internal3, average, highest, lowest, trend, improvementPct } = resultsSummary;
+
+      // Calculate Attendance stats from DB
+      const totalAtt = attendanceLogs.length;
+      const presentAtt = attendanceLogs.filter(a => a.status === 'Present').length;
+      const attendancePercentage = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 85;
+
+      // Calculate pending assignments
+      const pendingAssignments = [];
+      assignments.forEach(a => {
+        const sub = submissions.find(s => s.assignment_id.toString() === a._id.toString());
+        if (!sub) {
+          pendingAssignments.push({
+            title: a.title,
+            due_date: a.due_date
+          });
+        }
+      });
 
       // ── 4. Topic performance ──────────────────────────────────────────────
-      const topicDocs = await Topic.find({ course_id: courseId });
       const { weakTopics, averageTopics, strongTopics } = this.computeTopics(topicDocs, average);
 
       // ── 5. Course outcomes ────────────────────────────────────────────────
-      const outcomeDocs = await Outcome.find({ course_id: courseId });
       const { outcomeList, highestCO, lowestCO } = this.computeCourseOutcomes(outcomeDocs, average);
 
       // ── 6. Exam schedule & readiness ──────────────────────────────────────
-      const upcomingExam  = await ExamSchedule.findOne({ course_id: courseId }, { _id: 0, __v: 0 });
       const examReadiness = this.computeExamReadiness(average, weakTopics.length);
 
       // ── 7. RAG context (weak topic targeted) ──────────────────────────────
@@ -297,7 +329,7 @@ Respond ONLY with a valid JSON object in this exact structure (no markdown, no e
       const planSections = await this.generatePlanSections(
         student.name, courseName, average, trend,
         weakTopics, strongTopics, examReadiness, upcomingExam,
-        ragContext, historyMessages
+        ragContext, historyMessages, attendancePercentage, pendingAssignments
       );
 
       // ── 9. Build PDF ──────────────────────────────────────────────────────

@@ -6,7 +6,8 @@ const Result = require('../models/Result');
 // @access  Public
 exports.getTopics = async (req, res) => {
   try {
-    const { studentId, courseId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
+    const { courseId } = req.params;
 
     // 1. Find all topics for the selected course
     const topics = await Topic.find({ course_id: courseId });
@@ -33,7 +34,6 @@ exports.getTopics = async (req, res) => {
       let score = Math.round(averageMarks + offset);
       score = Math.min(100, Math.max(40, score)); // clamp between 40 and 100
 
-      // Status Logic
       let status = 'Weak';
       if (score >= 80) {
         status = 'Strong';
@@ -41,10 +41,21 @@ exports.getTopics = async (req, res) => {
         status = 'Average';
       }
 
+      let suggestions = 'Keep up the good work! Challenge yourself with advanced application problems.';
+      if (status === 'Weak') {
+        suggestions = 'Review lecture slides on ' + topic.topic_name + ', consult tutor, and complete basic exercises.';
+      } else if (status === 'Average') {
+        suggestions = 'Complete homework sets, review textbook section, and self-test core equations.';
+      }
+
+      const study_material = `${topic.topic_name.replace(/\s+/g, '_')}_Core_Notes.pdf`;
+
       return {
         topic_name: topic.topic_name,
         score,
-        status
+        status,
+        suggestions,
+        study_material
       };
     });
 

@@ -45,17 +45,27 @@ function safeUser(user) {
  */
 exports.login = async (req, res) => {
   try {
+    console.log('req.body:', req.body);
     const { email, password } = req.body;
-
+    console.log('Login attempt with email/userId:', email);
     // ── Validation ─────────────────────────────────────────────────────────────
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
     // ── Fetch user with password field ─────────────────────────────────────────
-    const user = await User.findByEmailWithPassword(email);
+    // Try to find by email first
+    let user = await User.findByEmailWithPassword(email);
+    // If not found, attempt to locate by student_id (allow login with student ID like stu001)
     if (!user) {
-      // Use generic message to prevent email enumeration
+      user = await User.findOne({ student_id: email }).select('+password');
+    }
+    // If still not found, attempt to locate by userId (e.g., usr_student_001)
+    if (!user) {
+      user = await User.findOne({ userId: email }).select('+password');
+    }
+    if (!user) {
+      // Use generic message to prevent enumeration
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 

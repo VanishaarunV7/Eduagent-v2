@@ -122,7 +122,7 @@ Your job is to classify the user's message into exactly one of the following cat
 
 CRITICAL RULES:
 - Has uploaded study materials: ${hasPdfs ? 'YES' : 'NO'}.
-  * If this is YES: You MUST NOT select "GeneralEducational". Any academic, concept, or topic explanation queries MUST be classified as "RAG" so they are strictly answered using the uploaded study materials.
+  * If this is YES: Any academic, concept, or topic explanation queries MUST be classified as "RAG" so they are strictly answered using the uploaded study materials, EXCEPT for general Computer Science, IT, or Programming concepts (like binary tree, stack, queue, database normalization, algorithms, coding) which should be classified as "GeneralEducational".
   * If this is NO: You MUST NOT select "RAG". Select "GeneralEducational" for academic, concept, or topic questions instead, so they can be answered using general knowledge.
 - Respond with ONLY the exact name of the category (e.g. "Analytics", "RAG", "PYQ", "GeneralEducational", "Exam", "StudyPlan", "Mentoring", "General", "Forbidden").
 - Do NOT include any formatting, markdown, punctuation, preambles, or explanations. Just return the single word.`;

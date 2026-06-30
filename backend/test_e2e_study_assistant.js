@@ -38,14 +38,31 @@ async function run() {
   const imagePath = path.join(__dirname, 'test_image.png');
 
   try {
+    // Authenticate first
+    console.log("[Test] Logging in to get JWT token...");
+    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'student@eduagent.com', password: 'Student@123' })
+    });
+    const loginData = await loginRes.json();
+    const token = loginData.token;
+    console.log("[Test] Token acquired successfully.");
+
+    const headers = { 'Authorization': `Bearer ${token}` };
+
     // 0. Clean up existing files in the database for a clean E2E run
     console.log("[Test] Cleaning up old test files for student 'stu001' and course 'cs_dbms'...");
-    const initialListRes = await fetch(`${baseUrl}/api/upload/student/stu001/course/cs_dbms`);
+    const initialListRes = await fetch(`${baseUrl}/api/upload/student/stu001/course/cs_dbms`, { headers });
     const initialList = await initialListRes.json();
-    for (const item of initialList) {
-      await fetch(`${baseUrl}/api/upload/${item._id}`, { method: 'DELETE' });
+    if (Array.isArray(initialList)) {
+      for (const item of initialList) {
+        await fetch(`${baseUrl}/api/upload/${item._id}`, { method: 'DELETE', headers });
+      }
+      console.log(`[Test] Deleted ${initialList.length} residual test files.`);
+    } else {
+      console.log(`[Test] No residual test files to clear (received: ${JSON.stringify(initialList)}).`);
     }
-    console.log(`[Test] Deleted ${initialList.length} residual test files.`);
 
     console.log(`[Test] Downloading valid sample DOCX from ${docxUrl}...`);
     await downloadFile(docxUrl, docxPath);
@@ -67,6 +84,7 @@ async function run() {
 
     const uploadRes = await fetch(`${baseUrl}/api/upload`, {
       method: 'POST',
+      headers,
       body: formData
     });
 
@@ -94,15 +112,20 @@ async function run() {
 
     const imgUploadRes = await fetch(`${baseUrl}/api/upload`, {
       method: 'POST',
+      headers,
       body: imgFormData
     });
     const imgUploadData = await imgUploadRes.json();
     console.log("Image Upload Status:", imgUploadRes.status);
     console.log("Image Upload Response:", JSON.stringify(imgUploadData, null, 2));
 
+    if (imgUploadRes.status !== 200) {
+      throw new Error(`Image upload failed with status ${imgUploadRes.status}`);
+    }
+
     // 3. List Uploaded Study Materials
     console.log("\n--- [Test 3] Testing List Study Materials ---");
-    const listRes = await fetch(`${baseUrl}/api/upload/student/stu001/course/cs_dbms`);
+    const listRes = await fetch(`${baseUrl}/api/upload/student/stu001/course/cs_dbms`, { headers });
     const listData = await listRes.json();
     console.log("List Status:", listRes.status);
     console.log("List count:", listData.length);
@@ -115,7 +138,7 @@ async function run() {
     console.log("\n--- [Test 4] Testing MCQ Generation Intent ---");
     const chatRes1 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -131,7 +154,7 @@ async function run() {
     console.log("\n--- [Test 5] Testing Topic Analyzer Intent ---");
     const chatRes2 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -146,7 +169,7 @@ async function run() {
     console.log("\n--- [Test 6] Testing PYQ Analyzer Intent ---");
     const chatRes3 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -161,7 +184,7 @@ async function run() {
     console.log("\n--- [Test 7] Testing Question Prediction Engine ---");
     const chatRes4 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -183,7 +206,7 @@ async function run() {
     console.log("\n--- [Test 8] Testing Strict RAG Warning Fallback ---");
     const chatRes5 = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -202,7 +225,7 @@ async function run() {
     console.log("\n--- [Test 8.1] Testing Forbidden Non-Academic Query ---");
     const chatResForbidden = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -221,7 +244,7 @@ async function run() {
     console.log("\n--- [Test 8.2] Testing Allowed General Educational Query ---");
     const chatResGenEd = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu001',
         course_id: 'cs_dbms',
@@ -240,7 +263,7 @@ async function run() {
     console.log("\n--- [Test 8.3] Testing Empty Database Analytics Fallback ---");
     const chatResEmptyDB = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         student_id: 'stu_nonexistent_999',
         course_id: 'course_nonexistent_999',
@@ -256,16 +279,16 @@ async function run() {
 
     // 9. Cleanup uploaded materials via Delete API
     console.log("\n--- [Test 9] Testing Delete Study Materials ---");
-    const deleteRes = await fetch(`${baseUrl}/api/upload/${documentId}`, { method: 'DELETE' });
+    const deleteRes = await fetch(`${baseUrl}/api/upload/${documentId}`, { method: 'DELETE', headers });
     console.log("Delete Docx Status:", deleteRes.status);
     
     if (imgUploadData._id) {
-      const deleteImgRes = await fetch(`${baseUrl}/api/upload/${imgUploadData._id}`, { method: 'DELETE' });
+      const deleteImgRes = await fetch(`${baseUrl}/api/upload/${imgUploadData._id}`, { method: 'DELETE', headers });
       console.log("Delete Image Status:", deleteImgRes.status);
     }
 
     // Verify deletion
-    const listRes2 = await fetch(`${baseUrl}/api/upload/student/stu001/course/cs_dbms`);
+    const listRes2 = await fetch(`${baseUrl}/api/upload/student/stu001/course/cs_dbms`, { headers });
     const listData2 = await listRes2.json();
     console.log("Verify List Count After Deletion:", listData2.length);
     if (listData2.length !== 0) {

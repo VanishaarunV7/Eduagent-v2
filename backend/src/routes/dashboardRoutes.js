@@ -3,7 +3,7 @@ const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const { authenticateJWT } = require('../middleware/auth');
 
-// Protected route – uses JWT to identify student & course
-router.get('/', authenticateJWT, dashboardController.getDashboardData);
+// Protected route – uses studentId & courseId parameters
+router.get('/:studentId/:courseId', authenticateJWT, dashboardController.getDashboardData);
 
 module.exports = router;

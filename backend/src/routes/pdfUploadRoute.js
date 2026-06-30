@@ -65,7 +65,7 @@ const handleMulterUpload = (req, res, next) => {
 
 // Routes definition
 router.post('/', authenticateJWT, handleMulterUpload, pdfUploadController.uploadPDF);
-router.get('/', authenticateJWT, pdfUploadController.listMaterials);
+router.get('/student/:studentId/course/:courseId', authenticateJWT, pdfUploadController.listMaterials);
 router.delete('/:documentId', authenticateJWT, pdfUploadController.deleteMaterial);
 
 module.exports = router;

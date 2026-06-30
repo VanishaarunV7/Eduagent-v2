@@ -5,6 +5,21 @@ async function test() {
   const baseUrl = `http://localhost:${PORT}`;
   console.log(`[E2E Agents Test] Testing against chatbot server at ${baseUrl}`);
 
+  let token = "";
+  try {
+    console.log("[Test] Logging in to get JWT token...");
+    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'student@eduagent.com', password: 'Student@123' })
+    });
+    const loginData = await loginRes.json();
+    token = loginData.token;
+    console.log("[Test] Token acquired successfully.");
+  } catch (err) {
+    console.error("Login failed:", err.message);
+  }
+
   const testCases = [
     {
       name: "Conversational / Mentoring query",
@@ -59,12 +74,18 @@ async function test() {
     try {
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(tc.body)
       });
 
       console.log(`HTTP Status: ${res.status}`);
       const data = await res.json();
+      if (res.status !== 200) {
+        console.log('Error Response Payload:', JSON.stringify(data, null, 2));
+      }
       console.log(`Selected Agent: ${data.agent}`);
       console.log(`Reply snippet: "${data.reply ? data.reply.slice(0, 150) : 'No reply'}..."`);
 

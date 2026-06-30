@@ -23,7 +23,10 @@ async function main() {
     await User.deleteMany({});
     console.log('🗑️  Cleared existing users');
 
-    const hashedPwd = await bcrypt.hash(DEFAULT_PASSWORD, SALT_ROUNDS);
+    const hashedPwd = await bcrypt.hash('EduAgent@123', SALT_ROUNDS);
+    const teacherPwd = await bcrypt.hash('Teacher@123', SALT_ROUNDS);
+    const studentPwd = await bcrypt.hash('Student@123', SALT_ROUNDS);
+    const adminPwd = await bcrypt.hash('Admin@123', SALT_ROUNDS);
 
     // ----------- Student Users -----------
     const studentDocs = await Student.find().limit(10).lean();
@@ -38,7 +41,7 @@ async function main() {
         student_id: doc.student_id,
         teacher_id: null,
         admin_id: null,
-        program_id: doc.program_id || null
+        program_id: doc.program_id || 'cs001'
       };
     });
 
@@ -68,7 +71,51 @@ async function main() {
       program_id: null
     };
 
+    // ----------- Compatibility Users -----------
+    const compatibilityUsers = [
+      {
+        userId: 'usr_student_001',
+        name: 'Aarav Sharma',
+        email: 'student@eduagent.com',
+        password: studentPwd,
+        role: 'student',
+        student_id: 'stu001',
+        teacher_id: null,
+        admin_id: null,
+        program_id: 'cs001'
+      },
+      {
+        userId: 'usr_student_002',
+        name: 'Priya Patel',
+        email: 'student2@eduagent.com',
+        password: studentPwd,
+        role: 'student',
+        student_id: 'stu002',
+        teacher_id: null,
+        admin_id: null,
+        program_id: 'cs001'
+      },
+      {
+        userId: 'usr_teacher_001',
+        name: 'Dr. Meera Nair',
+        email: 'teacher@eduagent.com',
+        password: teacherPwd,
+        role: 'teacher',
+        student_id: null,
+        teacher_id: 'tch001',
+        admin_id: null,
+        program_id: 'cs001'
+      }
+    ];
+
+    // Filter duplicates (in case emails match)
     const allUsers = [...studentUsers, ...teacherUsers, adminUser];
+    compatibilityUsers.forEach(cu => {
+      if (!allUsers.some(u => u.email === cu.email)) {
+        allUsers.push(cu);
+      }
+    });
+
     await User.insertMany(allUsers);
     console.log('🚀 Users seeded successfully');
 

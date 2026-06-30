@@ -12,7 +12,7 @@ exports.uploadPDF = async (req, res) => {
   const uploadedFiles = [];
   try {
     const files = req.files || (req.file ? [req.file] : []);
-    const studentId = req.body.student_id || req.body.studentId;
+    const studentId = req.user.role === 'student' ? req.user.student_id : (req.body.student_id || req.body.studentId);
     const course = req.body.course || req.body.course_id;
     const subject = req.body.subject || '';
 
@@ -60,10 +60,21 @@ exports.uploadPDF = async (req, res) => {
       };
 
       // Process document text, chunking
-      const processResult = await documentProcessorService.processDocument(file.path, fileType, metadataBase);
+      let processResult = { pages: 1, chunksCount: 0, documents: [] };
+      try {
+        processResult = await documentProcessorService.processDocument(file.path, fileType, metadataBase);
+      } catch (err) {
+        console.warn(`[Upload API] Document processing failed for ${file.originalname}:`, err.message);
+      }
 
-      // Store in ChromaDB
-      await vectorStoreService.addChunks(processResult.documents);
+      // Store in ChromaDB (with graceful connection fallback)
+      if (processResult.documents && processResult.documents.length > 0) {
+        try {
+          await vectorStoreService.addChunks(processResult.documents);
+        } catch (chromaErr) {
+          console.warn(`[Upload API] ChromaDB connection failed. Study material ${file.originalname} uploaded to MongoDB successfully, but vector indexing was skipped:`, chromaErr.message);
+        }
+      }
 
       // Save metadata in MongoDB
       const material = new StudyMaterial({
@@ -73,8 +84,8 @@ exports.uploadPDF = async (req, res) => {
         studentId: cleanStudentId,
         subject: subject,
         fileType: fileType,
-        pages: processResult.pages,
-        chunksCount: processResult.chunksCount
+        pages: processResult.pages || 1,
+        chunksCount: processResult.chunksCount || 0
       });
 
       await material.save();
@@ -106,7 +117,8 @@ exports.uploadPDF = async (req, res) => {
  */
 exports.listMaterials = async (req, res) => {
   try {
-    const { studentId, courseId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
+    const { courseId } = req.params;
     if (!studentId || !courseId) {
       return res.status(400).json({ message: 'Missing required parameters: studentId, courseId' });
     }
@@ -137,6 +149,11 @@ exports.deleteMaterial = async (req, res) => {
     const material = await StudyMaterial.findById(documentId);
     if (!material) {
       return res.status(404).json({ message: 'Study material not found' });
+    }
+
+    // Secure file deletion for students
+    if (req.user && req.user.role === 'student' && material.studentId !== req.user.student_id) {
+      return res.status(403).json({ message: 'Access denied. You can only delete your own study materials.' });
     }
 
     // 1. Remove file from disk

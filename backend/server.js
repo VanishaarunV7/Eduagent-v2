@@ -142,6 +142,8 @@ const chatRoutes = require('./src/routes/chatRoutes');
 const pdfUploadRoute = require('./src/routes/pdfUploadRoute');
 const studyPlanRoutes = require('./src/routes/studyPlanRoutes');
 const authRoutes = require('./src/routes/authRoutes');
+const teacherRoutes = require('./src/routes/teacherRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 const { authenticateJWT } = require('./src/middleware/auth');
 
 // Health check endpoint
@@ -205,6 +207,8 @@ app.use('/api/comparison', comparisonRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/upload', pdfUploadRoute);
 app.use('/api/study-plans', studyPlanRoutes);
+app.use('/api/teacher', teacherRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 Route handler
 app.use((req, res, next) => {

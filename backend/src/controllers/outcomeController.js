@@ -6,7 +6,8 @@ const Result = require('../models/Result');
 // @access  Public
 exports.getOutcomeAttainment = async (req, res) => {
   try {
-    const { studentId, courseId } = req.params;
+    const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
+    const { courseId } = req.params;
 
     // 1. Find all outcomes for the selected course
     const outcomes = await Outcome.find({ course_id: courseId });

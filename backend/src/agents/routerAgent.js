@@ -78,10 +78,17 @@ class RouterAgent {
    * @returns {Promise<string>} Target agent key
    */
   async classifyQuery(studentId, courseId, message, conversationMemory = '') {
+    // ===== BREAKPOINT 19 =====
+    // Mentor Demo:
+    // Router Agent starts classification process.
+    // Inspect message: message variable.
     try {
       const msg = message.toLowerCase().trim();
 
-      // 1. Local check for strictly forbidden non-educational topics
+      // ===== BREAKPOINT 20 =====
+      // Mentor Demo:
+      // Checking local forbidden query filters.
+      // Returns 'Forbidden' if non-academic topic matches.
       if (this.isForbiddenQuery(message)) {
         console.log('[RouterAgent] Local check matched forbidden query. Fast-routing to Forbidden.');
         return 'Forbidden';
@@ -106,7 +113,10 @@ class RouterAgent {
       // Check if student has uploaded documents for this course
       const hasPdfs = await ragService.hasUploadedDocuments(studentId, courseId).catch(() => false);
 
-      // 3. Groq LLM routing for intelligent classification
+      // ===== BREAKPOINT 21 =====
+      // Mentor Demo:
+      // Querying Groq LLM (llama-3.3-70b-versatile) to classify query intent.
+      // Inspect systemPrompt: categories descriptions.
       const systemPrompt = `You are the central Router Agent for EduAgent, an AI academic analytics and student mentor platform.
 Your job is to classify the user's message into exactly one of the following categories:
 
@@ -137,6 +147,10 @@ CRITICAL RULES:
       const classification = await groqService.chatCompletion(messages);
       const cleanClassification = classification.replace(/[^a-zA-Z]/g, '').trim();
 
+      // ===== BREAKPOINT 22 =====
+      // Mentor Demo:
+      // Routing decision resolved.
+      // Inspect cleanClassification: which specialized agent category is returned.
       const validCategories = ['Analytics', 'RAG', 'PYQ', 'GeneralEducational', 'Exam', 'StudyPlan', 'Mentoring', 'General', 'Forbidden'];
       if (validCategories.includes(cleanClassification)) {
         let finalClassification = cleanClassification;

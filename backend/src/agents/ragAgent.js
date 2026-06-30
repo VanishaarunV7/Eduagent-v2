@@ -20,13 +20,20 @@ class RAGAgent {
    */
   async handleQuery(studentId, courseId, message, historyMessages = []) {
     try {
-      // 1. Double check if student has uploaded materials for this course
+      // ===== BREAKPOINT 33 =====
+      // Mentor Demo: MongoDB Query.
+      // Collection Name: studymaterials
+      // Purpose: Check if documents exist in MongoDB before querying ChromaDB.
       const hasDocs = await ragService.hasUploadedDocuments(studentId, courseId);
       if (!hasDocs) {
         return "The requested information is not available in your uploaded study material.";
       }
 
-      // 2. Retrieve matching chunks from vector store (fetching up to 8 chunks to cover longer tasks)
+      // ===== BREAKPOINT 34 =====
+      // Mentor Demo:
+      // Querying Vector Store (ChromaDB) to retrieve matching contexts.
+      // Method called: retriever.retrieveContext.
+      // Returns: Array of similar chunks matching the student's question.
       let chunks = [];
       try {
         chunks = await retriever.retrieveContext(message, studentId, courseId, 8);
@@ -35,7 +42,10 @@ class RAGAgent {
         chunks = [];
       }
 
-      // 3. Delegate to Intent Router
+      // ===== BREAKPOINT 35 =====
+      // Mentor Demo:
+      // Delegating retrieved chunks to intentRouter.route to structure the prompt and query Groq.
+      // Inspect: chunks (context segments).
       return await intentRouter.route(studentId, courseId, message, chunks, historyMessages);
 
     } catch (error) {

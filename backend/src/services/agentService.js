@@ -23,13 +23,19 @@ class AgentService {
     try {
       console.log(`[AgentService] Received chat request from Student: ${studentId}, Course: ${courseId}, Session: ${session_id}`);
       
-      // 1. Store user message in MongoDB chat_history
+      // ===== BREAKPOINT 16 =====
+      // Mentor Demo: MongoDB Query (Insert / Save).
+      // Collection Name: chat_histories
+      // Purpose: Log the incoming user message to maintain session conversational memory.
       await chatHistoryService.saveMessage(studentId, courseId, session_id, 'user', message);
 
       // 2. Retrieve recent conversation memory context (last 10 messages excluding the current one)
       const { textBlock, chatMessages } = await memoryManager.loadMemory(studentId, courseId, session_id);
 
-      // 3. Pass memory context to RouterAgent to classify the query
+      // ===== BREAKPOINT 17 =====
+      // Mentor Demo:
+      // Deciding which agent to route the query to.
+      // Router Agent (routerAgent.classifyQuery) is called to analyze history and message.
       const targetAgent = await routerAgent.classifyQuery(studentId, courseId, message, textBlock);
       console.log(`[AgentService] RouterAgent designated target agent: ${targetAgent}`);
 
@@ -37,7 +43,10 @@ class AgentService {
       let agentLabel = '';
       let fullAnalyticsResult = null;
 
-      // 4. Delegate to the correct specialized agent passing history messages
+      // ===== BREAKPOINT 18 =====
+      // Mentor Demo:
+      // Dispatching request to the selected agent in Node.js.
+      // Inspect: targetAgent (Forbidden, GeneralEducational, PYQ, Analytics, RAG, Exam, StudyPlan, Mentoring).
       switch (targetAgent) {
         case 'Forbidden':
           agentLabel = 'System';

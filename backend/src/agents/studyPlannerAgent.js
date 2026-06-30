@@ -259,6 +259,10 @@ Respond ONLY with a valid JSON object in this exact structure (no markdown, no e
    * Returns { agent, reply, downloadUrl, preview } — never raw text.
    */
   async handleQuery(studentId, courseId, message, historyMessages = []) {
+    // ===== BREAKPOINT 36 =====
+    // Mentor Demo:
+    // Request enters Study Planner Agent.
+    // DB Queries (Promise.all) fetch student, results, syllabus topics, outcomes, exams, and attendance.
     try {
       console.log(`[Study Planner Agent] Generating personalized PDF study plan for student: ${studentId}, course: ${courseId}`);
 
@@ -325,14 +329,19 @@ Respond ONLY with a valid JSON object in this exact structure (no markdown, no e
       // ── 7. RAG context (weak topic targeted) ──────────────────────────────
       const ragContext = await this.buildRagContext(studentId, courseId, weakTopics);
 
-      // ── 8. Generate plan sections via Groq ────────────────────────────────
+      // ===== BREAKPOINT 37 =====
+      // Mentor Demo:
+      // Gathering metrics and calling generatePlanSections to generate daily/weekly plan JSON via Groq.
       const planSections = await this.generatePlanSections(
         student.name, courseName, average, trend,
         weakTopics, strongTopics, examReadiness, upcomingExam,
         ragContext, historyMessages, attendancePercentage, pendingAssignments
       );
 
-      // ── 9. Build PDF ──────────────────────────────────────────────────────
+      // ===== BREAKPOINT 38 =====
+      // Mentor Demo:
+      // Passing plan JSON and metrics to pdfGeneratorService to build the binary PDF document.
+      // Returns: fileId.
       const generatedAt = new Date().toISOString();
 
       const planData = {
@@ -371,6 +380,9 @@ Respond ONLY with a valid JSON object in this exact structure (no markdown, no e
 
       const downloadUrl = `/api/study-plans/download/${fileId}`;
 
+      // ===== BREAKPOINT 39 =====
+      // Mentor Demo:
+      // Returning study plan payload containing downloadUrl and preview variables back to client.
       return {
         agent:       this.agentName,
         reply:       `Your personalized study plan for **${courseName}** has been generated successfully! It covers ${PLAN_DURATION} of structured study, ${weakTopics.length} weak topic(s) to focus on, daily timetable, weekly goals, and AI-powered revision tips.`,

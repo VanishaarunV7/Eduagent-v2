@@ -34,6 +34,10 @@ exports.uploadPDF = async (req, res) => {
 
     console.log(`[Upload API] Processing ${files.length} file(s) for Student: ${cleanStudentId}, Course: ${courseId}`);
 
+    // ===== BREAKPOINT 29 =====
+    // Mentor Demo:
+    // POST /api/upload received. Multipart file payload.
+    // Inspect: files array, courseId, cleanStudentId.
     const results = [];
 
     for (const file of files) {
@@ -44,7 +48,6 @@ exports.uploadPDF = async (req, res) => {
       else if (ext === '.ppt' || ext === '.pptx') fileType = 'pptx';
       else if (['.png', '.jpg', '.jpeg'].includes(ext)) fileType = 'image';
       else {
-        // Safe check
         fs.unlinkSync(file.path);
         continue;
       }
@@ -59,7 +62,11 @@ exports.uploadPDF = async (req, res) => {
         uploadDate: new Date().toISOString()
       };
 
-      // Process document text, chunking
+      // ===== BREAKPOINT 30 =====
+      // Mentor Demo:
+      // Document processing and chunking.
+      // Method called: documentProcessorService.processDocument.
+      // Returns: pages parsed, count of chunks generated, and the documents array.
       let processResult = { pages: 1, chunksCount: 0, documents: [] };
       try {
         processResult = await documentProcessorService.processDocument(file.path, fileType, metadataBase);
@@ -67,7 +74,11 @@ exports.uploadPDF = async (req, res) => {
         console.warn(`[Upload API] Document processing failed for ${file.originalname}:`, err.message);
       }
 
-      // Store in ChromaDB (with graceful connection fallback)
+      // ===== BREAKPOINT 31 =====
+      // Mentor Demo:
+      // Ingesting document chunks into the Vector Database (ChromaDB).
+      // Method called: vectorStoreService.addChunks.
+      // ChromaDB computes Xenova/all-MiniLM-L6-v2 embeddings and indexes chunks.
       if (processResult.documents && processResult.documents.length > 0) {
         try {
           await vectorStoreService.addChunks(processResult.documents);
@@ -76,7 +87,10 @@ exports.uploadPDF = async (req, res) => {
         }
       }
 
-      // Save metadata in MongoDB
+      // ===== BREAKPOINT 32 =====
+      // Mentor Demo: MongoDB Query (Insert).
+      // Collection Name: studymaterials
+      // Purpose: Store document metadata reference (filename, filePath, pageCount, chunksCount).
       const material = new StudyMaterial({
         filename: file.originalname,
         filePath: file.path,

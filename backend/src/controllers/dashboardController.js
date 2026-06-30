@@ -15,6 +15,11 @@ const StudyMaterial = require('../models/StudyMaterial');
 // @route   GET /api/dashboard/:studentId/:courseId
 // @access  Public
 exports.getDashboardData = async (req, res) => {
+  // ===== BREAKPOINT 8 =====
+  // Mentor Demo:
+  // Request enters Dashboard Controller.
+  // Student ID derived from JWT context: req.user.student_id
+  // Target Course ID: req.params.courseId
   try {
     const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
     const courseId = req.params.courseId;
@@ -34,7 +39,11 @@ exports.getDashboardData = async (req, res) => {
       return res.status(403).json({ message: "Access denied. You can only view your own dashboard." });
     }
 
-    // 1. Fetch student to check if they exist
+    // ===== BREAKPOINT 9 =====
+    // Mentor Demo: MongoDB Query.
+    // Collection Name: students
+    // Purpose: Fetch student profile details.
+    // Returned data: Student profile document (name, program_id, batch).
     const student = await Student.findOne({ student_id: studentId }, { _id: 0, __v: 0 });
     console.log(student);
 
@@ -42,7 +51,11 @@ exports.getDashboardData = async (req, res) => {
       return res.status(404).json({ message: "Resource not found" });
     }
 
-    // 2. Fetch course to check if it exists
+    // ===== BREAKPOINT 10 =====
+    // Mentor Demo: MongoDB Query.
+    // Collection Name: courses
+    // Purpose: Fetch course details.
+    // Returned data: Course details (course_name, program_id).
     const course = await Course.findOne({ course_id: courseId });
     console.log(course);
 
@@ -50,7 +63,11 @@ exports.getDashboardData = async (req, res) => {
       return res.status(404).json({ message: "Resource not found" });
     }
 
-    // 3. Fetch all other details in parallel
+    // ===== BREAKPOINT 11 =====
+    // Mentor Demo: Parallel MongoDB Queries.
+    // Collections Names: results, topics, outcomes, examschedules, attendances, assignments, assignmentsubmissions, announcements, studymaterials.
+    // Purpose: Query marks, syllabus topics, outcomes, schedules, and attendance histories in parallel.
+    // Returned data: raw data objects for each category.
     const [results, topics, outcomes, examSchedule, attendanceLogs, assignments, submissions, announcements, studyMaterials] = await Promise.all([
       Result.find({ student_id: studentId, course_id: courseId }),
       Topic.find({ course_id: courseId }),
@@ -214,7 +231,10 @@ exports.getDashboardData = async (req, res) => {
       academicStatus = "Academic Probation";
     }
 
-    // 6. Return Structured Dashboard Data
+    // ===== BREAKPOINT 12 =====
+    // Mentor Demo:
+    // Merged JSON payload is sent back to Angular.
+    // Inspect payload contents: gpa, academic_status, attendance, topics performance.
     res.status(200).json({
       student,
       analytics,

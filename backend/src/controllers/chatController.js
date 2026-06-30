@@ -9,6 +9,11 @@ const Student = require('../models/Student');
  * @param {Express.Response} res 
  */
 exports.handleChat = async (req, res) => {
+  // ===== BREAKPOINT 13 =====
+  // Mentor Demo:
+  // POST /api/chat received from Angular.
+  // req.body contains: course_id, message, session_id.
+  // Inspect message: "What are my weak topics?" or "Generate study plan" or "What is Paging?".
   try {
     const student_id = req.user.role === 'student' ? req.user.student_id : req.body.student_id;
     const { course_id, message, session_id } = req.body;
@@ -28,10 +33,16 @@ exports.handleChat = async (req, res) => {
       });
     }
 
-    // Delegate query to the Multi-Agent System
+    // ===== BREAKPOINT 14 =====
+    // Mentor Demo:
+    // Forwarding query to the Multi-Agent orchestrator: agentService.handleChatQuery.
+    // Inspect: student_id, course_id, message.
     const result = await agentService.handleChatQuery(student_id, course_id, message, session_id);
 
-    // Return response containing agent metadata, reply content, session_id, and any other metrics
+    // ===== BREAKPOINT 15 =====
+    // Mentor Demo:
+    // Sending final agent reply back to Angular.
+    // Inspect: result.reply, result.agent (which agent resolved it).
     return res.status(200).json({
       ...result,
       agent: result.agent,

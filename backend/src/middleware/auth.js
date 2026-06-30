@@ -16,6 +16,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'eduagent_jwt_super_secret_key_2026
  * Attaches the decoded payload to req.user on success.
  */
 const authenticateJWT = (req, res, next) => {
+  // ===== BREAKPOINT 6 =====
+  // Mentor Demo:
+  // Request intercepts Authentication Middleware.
+  // Header: Authorization Header received. Inspect: authHeader.
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -28,6 +32,12 @@ const authenticateJWT = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
+    // ===== BREAKPOINT 7 =====
+    // Mentor Demo:
+    // Verifying JWT Signature and decoding payload.
+    // Verification: jwt.verify(token, JWT_SECRET) is called.
+    // Decoded Payload: Inspect 'decoded' (contains student_id, role, program_id).
+    // Result: Decoded payload is attached to req.user for downstream controllers.
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();

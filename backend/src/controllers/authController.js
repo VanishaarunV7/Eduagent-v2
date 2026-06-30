@@ -44,6 +44,10 @@ function safeUser(user) {
  * Body: { email, password }
  */
 exports.login = async (req, res) => {
+  // ===== BREAKPOINT 1 =====
+  // Mentor Demo:
+  // Request enters Login Controller.
+  // req.body contains the submitted credentials. Inspect: email, password.
   try {
     console.log('req.body:', req.body);
     const { email, password } = req.body;
@@ -53,19 +57,20 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    // ── Fetch user with password field ─────────────────────────────────────────
-    // Try to find by email first
+    // ===== BREAKPOINT 2 =====
+    // Mentor Demo:
+    // MongoDB query to find user.
+    // Collection Name: users
+    // Purpose: Fetch user document matching email/student_id/userId with their password hash.
+    // Returned user: the user record containing userId, role, and hashed password.
     let user = await User.findByEmailWithPassword(email);
-    // If not found, attempt to locate by student_id (allow login with student ID like stu001)
     if (!user) {
       user = await User.findOne({ student_id: email }).select('+password');
     }
-    // If still not found, attempt to locate by userId (e.g., usr_student_001)
     if (!user) {
       user = await User.findOne({ userId: email }).select('+password');
     }
     if (!user) {
-      // Use generic message to prevent enumeration
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
@@ -73,22 +78,31 @@ exports.login = async (req, res) => {
       return res.status(403).json({ message: 'Your account has been deactivated. Please contact an administrator.' });
     }
 
-    // ── Password check ─────────────────────────────────────────────────────────
+    // ===== BREAKPOINT 3 =====
+    // Mentor Demo:
+    // Comparing raw password with database hash using bcrypt.
+    // Inspect: password (raw text), user.comparePassword output.
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
-    // ── Update lastLogin ───────────────────────────────────────────────────────
     user.lastLogin = new Date();
     await user.save();
 
-    // ── Sign JWT ───────────────────────────────────────────────────────────────
+    // ===== BREAKPOINT 4 =====
+    // Mentor Demo:
+    // Generating JSON Web Token (JWT) payload and signing it.
+    // Payload fields: userId, name, email, role, student_id, program_id.
     const payload = buildTokenPayload(user);
     const token   = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 
     console.log(`[AuthController] Login successful: ${user.email} (${user.role})`);
 
+    // ===== BREAKPOINT 5 =====
+    // Mentor Demo:
+    // Sending JWT Response back to Angular.
+    // Inspect: token (signed JWT string), safeUser(user) (role, program_id, names).
     return res.status(200).json({
       message: 'Login successful.',
       token,

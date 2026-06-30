@@ -543,11 +543,19 @@ class AnalyticsAgent {
    * @returns {Promise<Object>} { agent, intent, analysis, reply }
    */
   async handleQuery(studentId, courseId, message, historyMessages = []) {
+    // ===== BREAKPOINT 23 =====
+    // Mentor Demo:
+    // Request enters Student Analytics Agent.
+    // Intent is classified locally via regex. Inspect: intent.
     try {
       const intent = this.classifyIntent(message);
       console.log(`[Analytics Agent] Classified intent: "${intent}" for query: "${message}"`);
 
-      // ── 1. Fetch Student Profile ──────────────────────────────────────────
+      // ===== BREAKPOINT 24 =====
+      // Mentor Demo: MongoDB Query.
+      // Collection Name: students
+      // Purpose: Fetch student profile.
+      // Returned data: Student profile document (batch, program_id).
       const student = await Student.findOne({ student_id: studentId });
       if (!student) {
         return {
@@ -575,7 +583,11 @@ class AnalyticsAgent {
       }
       const courseName = course ? course.course_name : (courseId || 'the course');
 
-      // ── 4. Fetch & Compute Results ────────────────────────────────────────
+      // ===== BREAKPOINT 25 =====
+      // Mentor Demo: MongoDB Queries.
+      // Collection Names: results, topics, outcomes, examschedules, attendances, assignments, assignmentsubmissions, announcements.
+      // Purpose: Fetch academic records for analysis.
+      // Returned data: results array, attendance array.
       const [results, topics, outcomes, examSchedule, attendanceLogs, assignments, submissions, announcements] = await Promise.all([
         Result.find({ student_id: studentId, course_id: courseId }),
         Topic.find({ course_id: courseId }),
@@ -756,6 +768,11 @@ ${historyStr}
 ${'─'.repeat(40)}
 `.trim();
 
+      // ===== BREAKPOINT 26 =====
+      // Mentor Demo:
+      // Node.js finishes compiling student assessment marks, averages, attendance, and topics.
+      // Inspect: structuredContext (text summary of the database states).
+
       // ── 11. Build Intent-Specific System Prompt ───────────────────────────
       const intentInstruction = this.buildIntentInstruction(intent, {
         weakTopics, strongTopics, averageTopics, trend, improvementPct,
@@ -780,6 +797,10 @@ CURRENT QUESTION INTENT: ${intent.replace(/_/g, ' ').toUpperCase()}
 SPECIFIC INSTRUCTIONS FOR THIS QUESTION:
 ${intentInstruction}`;
 
+      // ===== BREAKPOINT 27 =====
+      // Mentor Demo:
+      // Assembling system prompt guidelines and user message payload.
+      // Inspect: systemPrompt, messages (array of prompts, history, and user input).
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'system', content: `STUDENT ACADEMIC DATA CONTEXT:\n${'='.repeat(50)}\n${structuredContext}\n${'='.repeat(50)}` },
@@ -787,6 +808,10 @@ ${intentInstruction}`;
         { role: 'user', content: message }
       ];
 
+      // ===== BREAKPOINT 28 =====
+      // Mentor Demo:
+      // Requesting completion from Groq API (llama-3.3-70b-versatile).
+      // Inspect: reply (natural language explanation response).
       console.log(`[Analytics Agent] Sending structured context to Groq for intent: "${intent}"...`);
       const reply = await groqService.chatCompletion(messages);
 

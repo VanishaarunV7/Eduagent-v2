@@ -20,20 +20,13 @@ class RAGAgent {
    */
   async handleQuery(studentId, courseId, message, historyMessages = []) {
     try {
-      // ===== BREAKPOINT 33 =====
-      // Mentor Demo: MongoDB Query.
-      // Collection Name: studymaterials
-      // Purpose: Check if documents exist in MongoDB before querying ChromaDB.
+      // Check if study materials exist for the student
       const hasDocs = await ragService.hasUploadedDocuments(studentId, courseId);
       if (!hasDocs) {
         return "The requested information is not available in your uploaded study material.";
       }
 
-      // ===== BREAKPOINT 34 =====
-      // Mentor Demo:
-      // Querying Vector Store (ChromaDB) to retrieve matching contexts.
-      // Method called: retriever.retrieveContext.
-      // Returns: Array of similar chunks matching the student's question.
+      // Run similarity search query against ChromaDB Vector Store
       let chunks = [];
       try {
         chunks = await retriever.retrieveContext(message, studentId, courseId, 8);
@@ -42,10 +35,30 @@ class RAGAgent {
         chunks = [];
       }
 
-      // ===== BREAKPOINT 35 =====
-      // Mentor Demo:
-      // Delegating retrieved chunks to intentRouter.route to structure the prompt and query Groq.
-      // Inspect: chunks (context segments).
+      // ===========================================
+      // MENTOR DEMO - BREAKPOINT 14
+      // Place breakpoint here.
+      //
+      // Explain:
+      // How RAG retrieves information from uploaded PDFs.
+      // The RAG Agent check verifies if documents exist for this course in MongoDB.
+      // It then runs a similarity search by embedding the user's question and querying the ChromaDB Vector Store to retrieve the most relevant text chunks.
+      // Finally, these text chunks are injected as reference context in the LLM system prompt sent to Groq.
+      //
+      // Inspect:
+      // studentId
+      // courseId
+      // message
+      // chunks
+      //
+      // Expected value:
+      // studentId: "STU10001"
+      // courseId: "CS101"
+      // message: "What is Paging?"
+      // chunks: Array of objects containing text snippets from the uploaded PDF document (e.g., page contents describing paging memory management)
+      //
+      // Press F10.
+      // ===========================================
       return await intentRouter.route(studentId, courseId, message, chunks, historyMessages);
 
     } catch (error) {

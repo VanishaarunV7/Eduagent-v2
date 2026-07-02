@@ -44,10 +44,26 @@ function safeUser(user) {
  * Body: { email, password }
  */
 exports.login = async (req, res) => {
-  // ===== BREAKPOINT 1 =====
-  // Mentor Demo:
-  // Request enters Login Controller.
-  // req.body contains the submitted credentials. Inspect: email, password.
+  // ===========================================
+  // MENTOR DEMO - BREAKPOINT 1
+  // Place breakpoint here.
+  //
+  // Explain:
+  // The Angular frontend has sent a login request containing the student's email and password.
+  // The backend controller extracts these fields from the HTTP request body.
+  //
+  // Inspect:
+  // req.body
+  // email
+  // password
+  //
+  // Expected value:
+  // req.body: { email: "student@example.com", password: "password123" }
+  // email: "student@example.com"
+  // password: "password123"
+  //
+  // Press F10.
+  // ===========================================
   try {
     console.log('req.body:', req.body);
     const { email, password } = req.body;
@@ -57,12 +73,23 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    // ===== BREAKPOINT 2 =====
-    // Mentor Demo:
-    // MongoDB query to find user.
-    // Collection Name: users
-    // Purpose: Fetch user document matching email/student_id/userId with their password hash.
-    // Returned user: the user record containing userId, role, and hashed password.
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 2
+    // Place breakpoint here.
+    //
+    // Explain:
+    // The backend queries the "users" collection in MongoDB to locate the user profile matching the provided email, student_id, or userId.
+    //
+    // Inspect:
+    // email
+    // user
+    //
+    // Expected value:
+    // email: "student@example.com"
+    // user: Mongoose Document containing fields like userId, role ("student"), name, and the hashed password.
+    //
+    // Press F10.
+    // ===========================================
     let user = await User.findByEmailWithPassword(email);
     if (!user) {
       user = await User.findOne({ student_id: email }).select('+password');
@@ -78,10 +105,23 @@ exports.login = async (req, res) => {
       return res.status(403).json({ message: 'Your account has been deactivated. Please contact an administrator.' });
     }
 
-    // ===== BREAKPOINT 3 =====
-    // Mentor Demo:
-    // Comparing raw password with database hash using bcrypt.
-    // Inspect: password (raw text), user.comparePassword output.
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 3
+    // Place breakpoint here.
+    //
+    // Explain:
+    // Verifying the password. Bcrypt compares the plain-text password from the request body against the secure hashed password retrieved from MongoDB.
+    //
+    // Inspect:
+    // password
+    // isMatch
+    //
+    // Expected value:
+    // password: "password123"
+    // isMatch: true
+    //
+    // Press F10.
+    // ===========================================
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password.' });
@@ -90,19 +130,43 @@ exports.login = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // ===== BREAKPOINT 4 =====
-    // Mentor Demo:
-    // Generating JSON Web Token (JWT) payload and signing it.
-    // Payload fields: userId, name, email, role, student_id, program_id.
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 4
+    // Place breakpoint here.
+    //
+    // Explain:
+    // The password is correct, so the backend generates a JWT token. It packages the student's identity details into a token payload and signs it using the secret key (JWT_SECRET).
+    //
+    // Inspect:
+    // payload
+    // token
+    //
+    // Expected value:
+    // payload: { userId: "...", name: "...", email: "student@example.com", role: "student", student_id: "...", program_id: "..." }
+    // token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." (a signed JWT string)
+    //
+    // Press F10.
+    // ===========================================
     const payload = buildTokenPayload(user);
     const token   = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 
     console.log(`[AuthController] Login successful: ${user.email} (${user.role})`);
 
-    // ===== BREAKPOINT 5 =====
-    // Mentor Demo:
-    // Sending JWT Response back to Angular.
-    // Inspect: token (signed JWT string), safeUser(user) (role, program_id, names).
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 5
+    // Place breakpoint here.
+    //
+    // Explain:
+    // The JWT token is returned back to the Angular frontend inside a JSON response. The client will store this token and use it for authenticated routes.
+    //
+    // Inspect:
+    // token
+    //
+    // Expected value:
+    // token: "eyJhbGciOi..."
+    //
+    // Press F10.
+    // ===========================================
     return res.status(200).json({
       message: 'Login successful.',
       token,

@@ -543,19 +543,12 @@ class AnalyticsAgent {
    * @returns {Promise<Object>} { agent, intent, analysis, reply }
    */
   async handleQuery(studentId, courseId, message, historyMessages = []) {
-    // ===== BREAKPOINT 23 =====
-    // Mentor Demo:
-    // Request enters Student Analytics Agent.
-    // Intent is classified locally via regex. Inspect: intent.
+    // Local regex-based intent classification.
     try {
       const intent = this.classifyIntent(message);
       console.log(`[Analytics Agent] Classified intent: "${intent}" for query: "${message}"`);
 
-      // ===== BREAKPOINT 24 =====
-      // Mentor Demo: MongoDB Query.
-      // Collection Name: students
-      // Purpose: Fetch student profile.
-      // Returned data: Student profile document (batch, program_id).
+      // Query student profile from MongoDB.
       const student = await Student.findOne({ student_id: studentId });
       if (!student) {
         return {
@@ -583,11 +576,7 @@ class AnalyticsAgent {
       }
       const courseName = course ? course.course_name : (courseId || 'the course');
 
-      // ===== BREAKPOINT 25 =====
-      // Mentor Demo: MongoDB Queries.
-      // Collection Names: results, topics, outcomes, examschedules, attendances, assignments, assignmentsubmissions, announcements.
-      // Purpose: Fetch academic records for analysis.
-      // Returned data: results array, attendance array.
+      // Query academic results and course details in parallel.
       const [results, topics, outcomes, examSchedule, attendanceLogs, assignments, submissions, announcements] = await Promise.all([
         Result.find({ student_id: studentId, course_id: courseId }),
         Topic.find({ course_id: courseId }),
@@ -768,10 +757,27 @@ ${historyStr}
 ${'─'.repeat(40)}
 `.trim();
 
-      // ===== BREAKPOINT 26 =====
-      // Mentor Demo:
-      // Node.js finishes compiling student assessment marks, averages, attendance, and topics.
-      // Inspect: structuredContext (text summary of the database states).
+      // ===========================================
+      // MENTOR DEMO - BREAKPOINT 13
+      // Place breakpoint here.
+      //
+      // Explain:
+      // How the Analytics Agent prepares context. The agent queries MongoDB collections (results, attendance, syllabus topics, outcomes, assignments) for this student. Then, it uses Node.js to aggregate scores, calculate the GPA, find weak/strong topics, and calculate attendance rates. Finally, it compiles a structured context text block and sends it along with the user's prompt to Groq (Llama-3.3) so the LLM can generate a natural language explanation without doing any math calculations itself.
+      //
+      // Inspect:
+      // results
+      // analysis
+      // structuredContext
+      // messages
+      //
+      // Expected value:
+      // results: Array of Mongoose documents containing internal marks
+      // analysis: Aggregated metrics object (average, GPA, weak topics list)
+      // structuredContext: A formatted text string listing student metrics
+      // messages: The structured prompt array containing System instructions, Academic Data Context, and user Message
+      //
+      // Press F10.
+      // ===========================================
 
       // ── 11. Build Intent-Specific System Prompt ───────────────────────────
       const intentInstruction = this.buildIntentInstruction(intent, {
@@ -797,10 +803,7 @@ CURRENT QUESTION INTENT: ${intent.replace(/_/g, ' ').toUpperCase()}
 SPECIFIC INSTRUCTIONS FOR THIS QUESTION:
 ${intentInstruction}`;
 
-      // ===== BREAKPOINT 27 =====
-      // Mentor Demo:
-      // Assembling system prompt guidelines and user message payload.
-      // Inspect: systemPrompt, messages (array of prompts, history, and user input).
+      // Assemble system prompt instructions and data payloads.
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'system', content: `STUDENT ACADEMIC DATA CONTEXT:\n${'='.repeat(50)}\n${structuredContext}\n${'='.repeat(50)}` },
@@ -808,10 +811,7 @@ ${intentInstruction}`;
         { role: 'user', content: message }
       ];
 
-      // ===== BREAKPOINT 28 =====
-      // Mentor Demo:
-      // Requesting completion from Groq API (llama-3.3-70b-versatile).
-      // Inspect: reply (natural language explanation response).
+      // Call Groq API for chat completion explanation.
       console.log(`[Analytics Agent] Sending structured context to Groq for intent: "${intent}"...`);
       const reply = await groqService.chatCompletion(messages);
 

@@ -78,17 +78,28 @@ class RouterAgent {
    * @returns {Promise<string>} Target agent key
    */
   async classifyQuery(studentId, courseId, message, conversationMemory = '') {
-    // ===== BREAKPOINT 19 =====
-    // Mentor Demo:
-    // Router Agent starts classification process.
-    // Inspect message: message variable.
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 12
+    // Place breakpoint here.
+    //
+    // Explain:
+    // How the Router chooses between Analytics Agent or RAG Agent.
+    // First, it applies regex checks for forbidden and common query terms. If those don't trigger, it queries Groq (Llama-3.3) with a system prompt detailing the specialties of each agent, and returns the classified agent intent.
+    //
+    // Inspect:
+    // message
+    // hasPdfs
+    //
+    // Expected value:
+    // message: "What are my weak topics?" (or "What is Paging?")
+    // hasPdfs: true (if notes uploaded) or false (if none uploaded)
+    //
+    // Press F10.
+    // ===========================================
     try {
       const msg = message.toLowerCase().trim();
 
-      // ===== BREAKPOINT 20 =====
-      // Mentor Demo:
-      // Checking local forbidden query filters.
-      // Returns 'Forbidden' if non-academic topic matches.
+      // Check local forbidden query filters.
       if (this.isForbiddenQuery(message)) {
         console.log('[RouterAgent] Local check matched forbidden query. Fast-routing to Forbidden.');
         return 'Forbidden';
@@ -113,10 +124,7 @@ class RouterAgent {
       // Check if student has uploaded documents for this course
       const hasPdfs = await ragService.hasUploadedDocuments(studentId, courseId).catch(() => false);
 
-      // ===== BREAKPOINT 21 =====
-      // Mentor Demo:
-      // Querying Groq LLM (llama-3.3-70b-versatile) to classify query intent.
-      // Inspect systemPrompt: categories descriptions.
+      // Querying Groq LLM to classify query intent.
       const systemPrompt = `You are the central Router Agent for EduAgent, an AI academic analytics and student mentor platform.
 Your job is to classify the user's message into exactly one of the following categories:
 
@@ -147,10 +155,7 @@ CRITICAL RULES:
       const classification = await groqService.chatCompletion(messages);
       const cleanClassification = classification.replace(/[^a-zA-Z]/g, '').trim();
 
-      // ===== BREAKPOINT 22 =====
-      // Mentor Demo:
-      // Routing decision resolved.
-      // Inspect cleanClassification: which specialized agent category is returned.
+      // Routing decision resolved. Inspect cleanClassification.
       const validCategories = ['Analytics', 'RAG', 'PYQ', 'GeneralEducational', 'Exam', 'StudyPlan', 'Mentoring', 'General', 'Forbidden'];
       if (validCategories.includes(cleanClassification)) {
         let finalClassification = cleanClassification;

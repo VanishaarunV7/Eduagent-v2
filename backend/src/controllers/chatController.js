@@ -9,11 +9,25 @@ const Student = require('../models/Student');
  * @param {Express.Response} res 
  */
 exports.handleChat = async (req, res) => {
-  // ===== BREAKPOINT 13 =====
-  // Mentor Demo:
-  // POST /api/chat received from Angular.
-  // req.body contains: course_id, message, session_id.
-  // Inspect message: "What are my weak topics?" or "Generate study plan" or "What is Paging?".
+  // ===========================================
+  // MENTOR DEMO - BREAKPOINT 11
+  // Place breakpoint here.
+  //
+  // Explain:
+  // The backend chatbot controller receives the student's message prompt from the Angular frontend.
+  //
+  // Inspect:
+  // req.body.message
+  // course_id
+  // student_id
+  //
+  // Expected value:
+  // req.body.message: "What are my weak topics?" or "What is Paging?"
+  // course_id: "CS101"
+  // student_id: "STU10001"
+  //
+  // Press F10.
+  // ===========================================
   try {
     const student_id = req.user.role === 'student' ? req.user.student_id : req.body.student_id;
     const { course_id, message, session_id } = req.body;
@@ -33,17 +47,27 @@ exports.handleChat = async (req, res) => {
       });
     }
 
-    // ===== BREAKPOINT 14 =====
-    // Mentor Demo:
-    // Forwarding query to the Multi-Agent orchestrator: agentService.handleChatQuery.
-    // Inspect: student_id, course_id, message.
+    // Delegate processing to the Multi-Agent orchestrator
     const result = await agentService.handleChatQuery(student_id, course_id, message, session_id);
 
-    // ===== BREAKPOINT 15 =====
-    // Mentor Demo:
-    // Sending final agent reply back to Angular.
-    // Inspect: result.reply, result.agent (which agent resolved it).
-    return res.status(200).json({
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 15
+    // Place breakpoint here.
+    //
+    // Explain:
+    // The agent service has finished processing. The controller returns the AI agent's response payload back to the Angular client.
+    //
+    // Inspect:
+    // result.agent
+    // result.reply
+    //
+    // Expected value:
+    // result.agent: "Analytics Agent" (or "RAG Agent")
+    // result.reply: "Hello student, based on your grades, your weakest areas are..." (or details from notes)
+    //
+    // Press F10.
+    // ===========================================
+    return res.uuatus(200).json({
       ...result,
       agent: result.agent,
       reply: result.reply,

@@ -15,11 +15,23 @@ const StudyMaterial = require('../models/StudyMaterial');
 // @route   GET /api/dashboard/:studentId/:courseId
 // @access  Public
 exports.getDashboardData = async (req, res) => {
-  // ===== BREAKPOINT 8 =====
-  // Mentor Demo:
-  // Request enters Dashboard Controller.
-  // Student ID derived from JWT context: req.user.student_id
-  // Target Course ID: req.params.courseId
+  // ===========================================
+  // MENTOR DEMO - BREAKPOINT 8
+  // Place breakpoint here.
+  //
+  // Explain:
+  // The backend extracts the student_id from req.user (injected by the JWT auth middleware) and courseId from the request parameters.
+  //
+  // Inspect:
+  // req.user.student_id
+  // courseId
+  //
+  // Expected value:
+  // req.user.student_id: "STU10001" (or the logged-in student's ID)
+  // courseId: "CS101"
+  //
+  // Press F10.
+  // ===========================================
   try {
     const studentId = req.user.role === 'student' ? req.user.student_id : req.params.studentId;
     const courseId = req.params.courseId;
@@ -39,11 +51,7 @@ exports.getDashboardData = async (req, res) => {
       return res.status(403).json({ message: "Access denied. You can only view your own dashboard." });
     }
 
-    // ===== BREAKPOINT 9 =====
-    // Mentor Demo: MongoDB Query.
-    // Collection Name: students
-    // Purpose: Fetch student profile details.
-    // Returned data: Student profile document (name, program_id, batch).
+    // Fetch student profile details.
     const student = await Student.findOne({ student_id: studentId }, { _id: 0, __v: 0 });
     console.log(student);
 
@@ -51,11 +59,7 @@ exports.getDashboardData = async (req, res) => {
       return res.status(404).json({ message: "Resource not found" });
     }
 
-    // ===== BREAKPOINT 10 =====
-    // Mentor Demo: MongoDB Query.
-    // Collection Name: courses
-    // Purpose: Fetch course details.
-    // Returned data: Course details (course_name, program_id).
+    // Fetch course details.
     const course = await Course.findOne({ course_id: courseId });
     console.log(course);
 
@@ -63,11 +67,27 @@ exports.getDashboardData = async (req, res) => {
       return res.status(404).json({ message: "Resource not found" });
     }
 
-    // ===== BREAKPOINT 11 =====
-    // Mentor Demo: Parallel MongoDB Queries.
-    // Collections Names: results, topics, outcomes, examschedules, attendances, assignments, assignmentsubmissions, announcements, studymaterials.
-    // Purpose: Query marks, syllabus topics, outcomes, schedules, and attendance histories in parallel.
-    // Returned data: raw data objects for each category.
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 9
+    // Place breakpoint here.
+    //
+    // Explain:
+    // How MongoDB data is fetched and combined. We query multiple collections (results, attendances, assignments, course details) in parallel using Promise.all to minimize database roundtrips and request latency.
+    //
+    // Inspect:
+    // results
+    // attendanceLogs
+    // assignments
+    // examSchedule
+    //
+    // Expected value:
+    // results: Array of mark records (e.g. Internal 1, Internal 2 scores)
+    // attendanceLogs: Array of daily presence records
+    // assignments: Array of assignment documents with descriptions and deadlines
+    // examSchedule: Document containing exam_date, start_time, room
+    //
+    // Press F10.
+    // ===========================================
     const [results, topics, outcomes, examSchedule, attendanceLogs, assignments, submissions, announcements, studyMaterials] = await Promise.all([
       Result.find({ student_id: studentId, course_id: courseId }),
       Topic.find({ course_id: courseId }),
@@ -231,10 +251,27 @@ exports.getDashboardData = async (req, res) => {
       academicStatus = "Academic Probation";
     }
 
-    // ===== BREAKPOINT 12 =====
-    // Mentor Demo:
-    // Merged JSON payload is sent back to Angular.
-    // Inspect payload contents: gpa, academic_status, attendance, topics performance.
+    // ===========================================
+    // MENTOR DEMO - BREAKPOINT 10
+    // Place breakpoint here.
+    //
+    // Explain:
+    // The backend returns the final aggregated dashboard data as a JSON payload to the Angular frontend. This includes calculated GPAs, attendance percentage, graded assignments status, and topic status calculations.
+    //
+    // Inspect:
+    // student
+    // attendance
+    // academicStatus
+    // topicPerformanceList
+    //
+    // Expected value:
+    // student: { name: "...", student_id: "STU10001", program_id: "CS_UNDERGRAD", ... }
+    // attendance: 85 (calculated percentage)
+    // academicStatus: "Good Standing" (or "Honor Roll")
+    // topicPerformanceList: Array of topics with calculated scores and status ("Strong", "Average", "Weak")
+    //
+    // Press F10.
+    // ===========================================
     res.status(200).json({
       student,
       analytics,
